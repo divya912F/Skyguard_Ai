@@ -1,0 +1,6 @@
+{
+  "name": "SkyGuard AI",
+  "description": "Weather station sensor anomaly detection and health monitoring platform with real-time alert analysis and simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
