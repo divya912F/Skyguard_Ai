@@ -169,18 +169,42 @@ export const StationMap: React.FC<StationMapProps> = ({
                     fill={isSelected ? '#38bdf8' : ringColor}
                   />
 
-                  {/* Station Label */}
-                  <text
-                    x={x + 12}
-                    y={y + 4}
-                    fill={isSelected ? '#38bdf8' : '#cbd5e1'}
-                    fontSize={isSelected ? '11' : '9.5'}
-                    fontWeight={isSelected ? 'bold' : 'normal'}
-                    fontFamily="monospace"
-                    className="select-none drop-shadow-md"
-                  >
-                    {station.name.split(' ')[0]}
-                  </text>
+                  {/* Station Name & Live Temperature Tag on Map */}
+                  <g transform={`translate(${x + 10}, ${y - 9})`} className="cursor-pointer">
+                    <rect
+                      x={0}
+                      y={0}
+                      width={station.current_reading ? 76 : 56}
+                      height={18}
+                      rx={4}
+                      fill="#0b1120"
+                      stroke={isSelected ? '#38bdf8' : isHovered ? '#06b6d4' : '#334155'}
+                      strokeWidth={isSelected ? 1.5 : 1}
+                      fillOpacity={0.92}
+                    />
+                    <text
+                      x={5}
+                      y={12}
+                      fill={isSelected ? '#38bdf8' : '#e2e8f0'}
+                      fontSize="9"
+                      fontWeight={isSelected ? 'bold' : '500'}
+                      fontFamily="sans-serif"
+                    >
+                      {station.short_name || station.name.split(' ')[0]}
+                    </text>
+                    {station.current_reading && (
+                      <text
+                        x={48}
+                        y={12}
+                        fill="#fbbf24"
+                        fontSize="8.5"
+                        fontWeight="bold"
+                        fontFamily="monospace"
+                      >
+                        {station.current_reading.temperature.toFixed(1)}°
+                      </text>
+                    )}
+                  </g>
                 </g>
               );
             })}
@@ -218,14 +242,28 @@ export const StationMap: React.FC<StationMapProps> = ({
                     <p className="text-[11px] text-slate-400 mt-0.5">{active.state} • {active.region || 'Central'} Zone</p>
                   </div>
 
-                  {active.nominal_reading && (
-                    <div className="p-2.5 rounded-xl bg-slate-900 border border-white/10 space-y-1">
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold tracking-wider">Ground-Truth Calibrated Reading</span>
-                      <div className="flex items-center justify-between font-mono text-xs">
-                        <span className="text-amber-400 font-bold">{active.nominal_reading.temperature.toFixed(1)}°C</span>
-                        <span className="text-cyan-400 font-bold">{active.nominal_reading.relative_humidity}% RH</span>
-                        <span className="text-emerald-400 font-bold">{active.nominal_reading.surface_pressure} hPa</span>
+                  {(active.current_reading || active.nominal_reading) && (
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-white/10 space-y-1.5 shadow-inner">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                          Live Observation ({active.current_reading?.timestamp || 'Real-time'})
+                        </span>
+                        {active.current_reading?.weather_condition && (
+                          <span className="text-cyan-300 font-medium">{active.current_reading.weather_condition}</span>
+                        )}
                       </div>
+                      <div className="flex items-center justify-between font-mono text-xs">
+                        <span className="text-amber-400 font-bold">{(active.current_reading?.temperature ?? active.nominal_reading?.temperature ?? 0).toFixed(1)}°C</span>
+                        <span className="text-cyan-400 font-bold">{(active.current_reading?.relative_humidity ?? active.nominal_reading?.relative_humidity ?? 0).toFixed(0)}% RH</span>
+                        <span className="text-emerald-400 font-bold">{(active.current_reading?.surface_pressure ?? active.nominal_reading?.surface_pressure ?? 0).toFixed(1)} hPa</span>
+                      </div>
+                      {active.current_reading?.wind_speed_kmh !== undefined && (
+                        <div className="text-[10px] text-slate-400 flex items-center justify-between pt-0.5 border-t border-white/5">
+                          <span>Wind: {active.current_reading.wind_speed_kmh} km/h</span>
+                          <span className="text-slate-400 font-mono">{active.current_reading.data_source || 'PMFBY WINDS Feed'}</span>
+                        </div>
+                      )}
                     </div>
                   )}
 

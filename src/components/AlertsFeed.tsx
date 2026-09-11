@@ -186,6 +186,34 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({
     }
   };
 
+  const formatAlertTime = (timeStr: string) => {
+    if (!timeStr) return { time: '--:--', date: 'Live', full: '--' };
+
+    // Format "YYYY-MM-DD HH:mm:ss"
+    if (timeStr.includes(' ') && timeStr.includes('-')) {
+      const parts = timeStr.trim().split(' ');
+      const datePart = parts[0];
+      const timePart = parts[1].replace('IST', '').trim().substring(0, 5);
+      return { time: timePart, date: datePart, full: `${timePart} (${datePart})` };
+    }
+
+    // Format ISO "YYYY-MM-DDTHH:mm:ss"
+    if (timeStr.includes('T')) {
+      const parts = timeStr.split('T');
+      const datePart = parts[0];
+      const timePart = parts[1].substring(0, 5);
+      return { time: timePart, date: datePart, full: `${timePart} (${datePart})` };
+    }
+
+    // Format "HH:mm:ss IST"
+    if (timeStr.includes(':')) {
+      const timePart = timeStr.replace('IST', '').trim().substring(0, 5);
+      return { time: timePart, date: 'Live', full: `${timePart} IST` };
+    }
+
+    return { time: timeStr, date: '', full: timeStr };
+  };
+
   const handleExportIncidentReport = () => {
     const report = {
       generated_at: new Date().toISOString(),
@@ -516,10 +544,16 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({
 
                     {/* 2. TIME & STATION */}
                     <td className="py-3 px-3 whitespace-nowrap">
-                      <div className="font-semibold text-slate-200 flex items-center space-x-1 text-xs">
+                      <div className="font-semibold text-slate-200 flex items-center space-x-1.5 text-xs">
                         <Clock className="h-3 w-3 text-slate-400 shrink-0" />
-                        <span>{alert.time.substring(11, 16)}</span>
-                        <span className="text-slate-500 font-normal">({alert.time.substring(0, 10)})</span>
+                        <span>{formatAlertTime(alert.time).time}</span>
+                        <span className="text-slate-500 font-normal">({formatAlertTime(alert.time).date})</span>
+                        {alert.is_live && (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 text-[9px] font-mono border border-emerald-500/40 font-bold ml-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                            LIVE
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => onSelectStation?.(alert.location_id)}
@@ -534,19 +568,22 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({
                     {/* 3. FIELD READING (RAW) */}
                     <td className="py-3 px-3 whitespace-nowrap text-slate-300">
                       <div className="flex items-center space-x-2 text-[11px]">
-                        <span className={isWrong && Math.abs(deltaTemp) > 1 ? 'text-rose-300 font-bold' : 'text-slate-200'}>
+                        <span className={isWrong && Math.abs(deltaTemp) > 1 ? 'text-rose-300 font-bold' : alert.is_live ? 'text-cyan-200 font-bold' : 'text-slate-200'}>
                           {rawTemp.toFixed(1)}°C
                         </span>
                         <span className="text-slate-600">/</span>
-                        <span className={isWrong && Math.abs(deltaHum) > 5 ? 'text-rose-300 font-bold' : 'text-slate-200'}>
+                        <span className={isWrong && Math.abs(deltaHum) > 5 ? 'text-rose-300 font-bold' : alert.is_live ? 'text-cyan-200 font-bold' : 'text-slate-200'}>
                           {rawHum.toFixed(1)}%
                         </span>
                         <span className="text-slate-600">/</span>
-                        <span className={isWrong && Math.abs(deltaPress) > 3 ? 'text-rose-300 font-bold' : 'text-slate-200'}>
+                        <span className={isWrong && Math.abs(deltaPress) > 3 ? 'text-rose-300 font-bold' : alert.is_live ? 'text-cyan-200 font-bold' : 'text-slate-200'}>
                           {rawPress.toFixed(1)}
                         </span>
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">Temp / Hum / Press</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                        <span>Temp / Hum / Press</span>
+                        {alert.is_live && <span className="text-emerald-400 font-medium">• Live Telemetry</span>}
+                      </div>
                     </td>
 
                     {/* 4. CLEANED GROUND TRUTH */}
@@ -559,7 +596,7 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({
                         <span>{cleanPress.toFixed(1)}</span>
                       </div>
                       <div className="text-[10px] text-emerald-400/80 mt-0.5">
-                        {isWrong ? 'Imputed Baseline' : 'Original Verified'}
+                        {isWrong ? 'Imputed Baseline' : alert.is_live ? 'Live Verified Telemetry' : 'Original Verified'}
                       </div>
                     </td>
 
@@ -716,12 +753,19 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({
                         SIMULATED INJECTION
                       </span>
                     )}
+
+                    {alert.is_live && (
+                      <span className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-0.5 text-[10px] font-mono border border-emerald-500/40 font-bold flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                        LIVE TELEMETRY
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-3 text-slate-400 text-xs">
                     <span className="flex items-center space-x-1 font-mono text-[11px]">
                       <Clock className="h-3 w-3 text-slate-400" />
-                      <span>{alert.time}</span>
+                      <span>{formatAlertTime(alert.time).full}</span>
                     </span>
                     <button
                       onClick={() => onSelectStation?.(alert.location_id)}

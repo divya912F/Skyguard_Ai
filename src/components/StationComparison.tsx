@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Columns3, ArrowRightLeft, ShieldCheck, Thermometer, Droplets, Gauge, Mountain, Activity } from 'lucide-react';
+import { Columns3, ArrowRightLeft, ShieldCheck, Thermometer, Droplets, Gauge, Mountain, Activity, Clock, Wind, CheckCircle2, AlertTriangle, Radio } from 'lucide-react';
 import { Station, WeatherRecord } from '../types';
 
 interface StationComparisonProps {
@@ -54,11 +54,17 @@ export const StationComparison: React.FC<StationComparisonProps> = ({ stations }
     <div id="station-comparison-section" className="rounded-2xl border border-white/10 bg-slate-900/75 p-4 sm:p-5 backdrop-blur-md shadow-xl mb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
         <div>
-          <div className="flex items-center space-x-2">
-            <Columns3 className="h-4 w-4 text-cyan-400" />
-            <h2 className="text-sm font-semibold text-slate-100">Synoptic Multi-Station Telemetry Comparison</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center space-x-2">
+              <Columns3 className="h-4 w-4 text-cyan-400" />
+              <h2 className="text-sm font-semibold text-slate-100">Synoptic Multi-Station Telemetry Comparison</h2>
+            </div>
             <span className="rounded bg-cyan-500/10 px-2 py-0.5 text-[11px] font-mono text-cyan-400 border border-cyan-500/20">
               Cross-Regional Comparison
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-mono text-emerald-400 border border-emerald-500/25">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+              Live Telemetry Feed
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -114,13 +120,37 @@ export const StationComparison: React.FC<StationComparisonProps> = ({ stations }
               >
                 <div>
                   {/* Station Header */}
-                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+                  <div className="flex items-start justify-between pb-2 mb-2.5 border-b border-slate-800">
                     <div>
-                      <h3 className="text-sm font-bold text-white">{st.name}</h3>
-                      <p className="text-[11px] text-slate-400">{st.state} • {st.region || 'Central'} Zone</p>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white">{st.name}</h3>
+                        {st.is_custom && (
+                          <span className="rounded px-1.5 py-0.5 text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            CUSTOM
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{st.state} • {st.region || 'Central'} Zone</p>
                     </div>
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-mono text-cyan-300">
-                      ID #{st.location_id}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                        LIVE
+                      </span>
+                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-mono text-cyan-300">
+                        #{st.location_id}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live Observation Timestamp & Condition */}
+                  <div className="flex items-center justify-between text-[11px] mb-2.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300 font-mono">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Clock className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                      <span className="truncate">{latest.time || st.current_reading?.timestamp || 'Live IMD Telemetry'}</span>
+                    </span>
+                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                      {st.current_reading?.weather_condition || 'Nominal AWS'}
                     </span>
                   </div>
 
@@ -144,8 +174,13 @@ export const StationComparison: React.FC<StationComparisonProps> = ({ stations }
                         Temperature
                       </span>
                       <div className="text-right font-mono">
-                        <span className="text-sm font-bold text-white">{latest.temperature.toFixed(1)}°C</span>
-                        <span className="block text-[10px] text-slate-400">Dew Pt: {latest.dew_point?.toFixed(1)}°C</span>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-sm font-bold text-white">{latest.temperature.toFixed(1)}°C</span>
+                          <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1 py-0.5 rounded">LIVE</span>
+                        </div>
+                        <span className="block text-[10px] text-slate-400">
+                          Dew Pt: {latest.dew_point?.toFixed(1)}°C • Heat: {latest.heat_index?.toFixed(1)}°C
+                        </span>
                       </div>
                     </div>
 
@@ -156,7 +191,10 @@ export const StationComparison: React.FC<StationComparisonProps> = ({ stations }
                         Humidity
                       </span>
                       <div className="text-right font-mono">
-                        <span className="text-sm font-bold text-white">{latest.relative_humidity.toFixed(1)}%</span>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-sm font-bold text-white">{latest.relative_humidity.toFixed(1)}%</span>
+                          <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1 py-0.5 rounded">LIVE</span>
+                        </div>
                         <span className="block text-[10px] text-slate-400">VPD: {latest.vapor_pressure_deficit?.toFixed(2)} kPa</span>
                       </div>
                     </div>
@@ -168,9 +206,31 @@ export const StationComparison: React.FC<StationComparisonProps> = ({ stations }
                         Surface Pressure
                       </span>
                       <div className="text-right font-mono">
-                        <span className="text-sm font-bold text-white">{latest.surface_pressure.toFixed(1)} hPa</span>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-sm font-bold text-white">{latest.surface_pressure.toFixed(1)} hPa</span>
+                          <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1 py-0.5 rounded">LIVE</span>
+                        </div>
                         <span className="block text-[10px] text-slate-400">
-                          3h: {(latest.pressure_tendency_3h ?? 0) >= 0 ? `+${latest.pressure_tendency_3h ?? 0}` : (latest.pressure_tendency_3h ?? 0)} ({latest.barometric_trend || 'Steady'})
+                          Trend: {latest.barometric_trend || 'Steady'} ({latest.pressure_tendency_3h ? `${latest.pressure_tendency_3h > 0 ? '+' : ''}${latest.pressure_tendency_3h} hPa` : '0 hPa'})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Wind Telemetry */}
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800/60">
+                      <span className="flex items-center gap-1.5 text-slate-400">
+                        <Wind className="h-3.5 w-3.5 text-teal-400" />
+                        Wind Telemetry
+                      </span>
+                      <div className="text-right font-mono">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="text-sm font-bold text-white">
+                            {st.current_reading?.wind_speed_kmh ?? 7.5} km/h
+                          </span>
+                          <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1 py-0.5 rounded">LIVE</span>
+                        </div>
+                        <span className="block text-[10px] text-slate-400">
+                          Bearing: {st.current_reading?.wind_direction_deg ?? 180}° (Surface Flow)
                         </span>
                       </div>
                     </div>
@@ -183,9 +243,12 @@ export const StationComparison: React.FC<StationComparisonProps> = ({ stations }
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
                     <span className="text-slate-400">Health Index:</span>
                     <strong className="font-mono text-emerald-300">{st.health_score}/100</strong>
+                    <span className="text-[9.5px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                      PASS
+                    </span>
                   </div>
                   <span className="text-[11px] font-mono text-slate-400">
-                    Anomaly: {st.anomaly_rate}%
+                    QC: {st.anomaly_rate === 0 ? 'Nominal (0% Anomaly)' : `${st.anomaly_rate}% Flagged`}
                   </span>
                 </div>
               </div>

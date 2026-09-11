@@ -42,16 +42,35 @@ export interface Station {
     temperature: number;
     relative_humidity: number;
     surface_pressure: number;
+    wind_speed_kmh?: number;
+    wind_direction_deg?: number;
+    weather_condition?: string;
     temperature_change?: number;
     humidity_change?: number;
     pressure_change?: number;
     barometric_trend?: string;
     is_anomaly?: boolean;
     anomaly_type?: string;
+    timestamp?: string;
+    is_live?: boolean;
+    data_source?: string;
   };
   quality_advisory?: QualityAdvisory;
   annual_anomalies?: number;
   annual_readings?: number;
+  is_custom?: boolean;
+  readings_count?: number;
+  calibration_complete?: boolean;
+}
+
+export interface HourlySyncInfo {
+  source: string;
+  portal_url: string;
+  last_sync_time: string;
+  next_sync_seconds: number;
+  interval_minutes: number;
+  status: string;
+  station_count: number;
 }
 
 export interface WeatherRecord {
@@ -128,6 +147,7 @@ export interface AnomalyAlert {
   explanation: string;
   sensor_health: 'Healthy' | 'Warning' | 'Critical';
   is_simulated?: boolean;
+  is_live?: boolean;
   triage_status?: 'Open' | 'Investigating' | 'Verified Fault' | 'Resolved' | 'False Alarm';
   technician_notes?: string;
   updated_at?: string;
@@ -165,12 +185,18 @@ export interface StationHealthSummary {
     temperature: number;
     relative_humidity: number;
     surface_pressure: number;
+    wind_speed_kmh?: number;
+    wind_direction_deg?: number;
+    weather_condition?: string;
     temperature_change?: number;
     humidity_change?: number;
     pressure_change?: number;
     barometric_trend?: string;
     is_anomaly?: boolean;
     anomaly_type?: string;
+    timestamp?: string;
+    is_live?: boolean;
+    data_source?: string;
   };
   quality_advisory?: QualityAdvisory;
   region?: string;
@@ -287,4 +313,44 @@ export interface BenchmarkSuiteResult {
   f1_score_pct: number;
   avg_latency_ms: number;
   tests: BenchmarkTestCase[];
+}
+
+export interface CustomStationReading {
+  reading_number: number;
+  time: string;
+  temperature: number;
+  relative_humidity: number;
+  surface_pressure: number;
+  wind_speed_kmh?: number;
+  wind_direction_deg?: number;
+  is_calibration_phase: boolean;
+  calibration_status?: string;
+  is_anomaly: boolean;
+  anomaly_type: string;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  severity_score: number;
+  confidence: number;
+  explanation: string;
+  row_verdict: 'RIGHT' | 'WRONG';
+  qc_flag: 'PASS' | 'SUSPECT' | 'ERRONEOUS';
+  quality_advisory?: QualityAdvisory;
+  temperature_change?: number;
+  humidity_change?: number;
+  pressure_change?: number;
+  dew_point?: number;
+  heat_index?: number;
+  vapor_pressure_deficit?: number;
+  verification_checks?: VerificationCheck[];
+  model_diagnosis?: {
+    physics_rule?: string;
+    hardware_diagnostic?: string;
+    action_directive?: string;
+  };
+}
+
+export interface CustomStationData extends Station {
+  is_custom?: boolean;
+  readings_count?: number;
+  calibration_complete?: boolean;
+  readings?: CustomStationReading[];
 }

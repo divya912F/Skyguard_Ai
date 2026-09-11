@@ -12,8 +12,10 @@ import { DiurnalAnalytics } from './components/DiurnalAnalytics';
 import { StationComparison } from './components/StationComparison';
 import { ApiExplorerModal } from './components/ApiExplorerModal';
 import { CloudyBackground, CloudMood, CloudSpeed } from './components/CloudyBackground';
-import { Station, WeatherRecord, AlertsResponse, StationHealthSummary, AnomalyAlert } from './types';
-import { Layers, Activity, AlertTriangle, ShieldCheck, SunMedium, Columns3, Compass, Cloud, FlaskConical } from 'lucide-react';
+import { HourlyWeatherSyncBanner } from './components/HourlyWeatherSyncBanner';
+import { CustomStationDemo } from './components/CustomStationDemo';
+import { Station, WeatherRecord, AlertsResponse, StationHealthSummary, AnomalyAlert, HourlySyncInfo } from './types';
+import { Layers, Activity, AlertTriangle, ShieldCheck, SunMedium, Columns3, Compass, Cloud, FlaskConical, Cpu } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [stations, setStations] = useState<Station[]>([]);
@@ -22,9 +24,10 @@ export const App: React.FC = () => {
   const [weatherRecords, setWeatherRecords] = useState<WeatherRecord[]>([]);
   const [alertsData, setAlertsData] = useState<AlertsResponse | null>(null);
   const [healthBreakdown, setHealthBreakdown] = useState<StationHealthSummary[]>([]);
+  const [syncInfo, setSyncInfo] = useState<HourlySyncInfo | undefined>();
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isApiModalOpen, setIsApiModalOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'map' | 'diurnal' | 'compare' | 'simulator' | 'testlab' | 'health'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'custom-station' | 'map' | 'diurnal' | 'compare' | 'simulator' | 'testlab' | 'health'>('dashboard');
 
   // Cloud atmosphere background state (with localStorage recall)
   const [cloudMood, setCloudMood] = useState<CloudMood>(() => {
@@ -45,11 +48,12 @@ export const App: React.FC = () => {
   };
 
   // Fetch all initial and recurring telemetry data
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isLiveForce: boolean = false) => {
     setIsRefreshing(true);
     try {
-      // 1. Stations
-      const stationsRes = await fetch('/api/stations');
+      // 1. Stations (optionally forced live refresh)
+      const stationsUrl = isLiveForce ? '/api/stations?refresh=true' : '/api/stations';
+      const stationsRes = await fetch(stationsUrl);
       if (stationsRes.ok) {
         const sJson = await stationsRes.json();
         setStations(sJson.stations || []);
@@ -86,6 +90,13 @@ export const App: React.FC = () => {
         const hJson = await healthRes.json();
         setHealthBreakdown(hJson.stations || []);
       }
+
+      // 5. Hourly sync status info from PMFBY WINDS
+      const syncRes = await fetch('/api/weather/sync-info');
+      if (syncRes.ok) {
+        const sInfo = await syncRes.json();
+        setSyncInfo(sInfo);
+      }
     } catch (err) {
       console.error('Failed to fetch SkyGuard AI telemetry:', err);
     } finally {
@@ -96,6 +107,49 @@ export const App: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Automated hourly update scheduler (updates itself every hour and at top of the hour)
+  useEffect(() => {
+    const triggerHourlyAutoSync = () => {
+      console.log('[SkyGuard AI] Auto-hourly update triggered at the top of the hour.');
+      fetchData(true);
+    };
+
+    // Primary 60-minute recurring interval
+    const hourlyInterval = setInterval(triggerHourlyAutoSync, 3600000);
+
+    // Synchronize to the exact next top-of-the-hour (:00 minutes)
+    const now = new Date();
+    const minutesToNextHour = 60 - now.getMinutes();
+    const msToNextHour = minutesToNextHour * 60000 - now.getSeconds() * 1000 - now.getMilliseconds();
+
+    const topOfHourTimer = setTimeout(() => {
+      triggerHourlyAutoSync();
+    }, Math.max(1000, msToNextHour));
+
+    return () => {
+      clearInterval(hourlyInterval);
+      clearTimeout(topOfHourTimer);
+    };
+  }, [fetchData]);
+
+  // Immediate manual trigger for hourly PMFBY WINDS sync
+  const handleSyncNow = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch('/api/weather/sync-now', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sync_info) setSyncInfo(data.sync_info);
+        if (data.stations) setStations(data.stations);
+      }
+      await fetchData(true);
+    } catch (err) {
+      console.error('Failed to sync PMFBY WINDS weather data:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Standard SIH Demo trigger (switches to Station 0 & surveillance view so user directly sees the spike)
   const handleTriggerStandardDemo = async (stayOnTab?: boolean) => {
@@ -189,8 +243,15 @@ export const App: React.FC = () => {
   };
 
   const currentStation = stations.find((s) => s.location_id === selectedStationId);
-  const latestRecord = weatherRecords.length > 0 ? weatherRecords[weatherRecords.length - 1] : undefined;
-  const isAnomalyCurrentlyActive = latestRecord?.is_anomaly ?? (alertsData ? alertsData.alerts.length > 0 : false);
+  const baseLatest = weatherRecords.length > 0 ? weatherRecords[weatherRecords.length - 1] : undefined;
+  const latestRecord: WeatherRecord | undefined = baseLatest ? {
+    ...baseLatest,
+    temperature: currentStation?.current_reading?.temperature ?? baseLatest.temperature,
+    relative_humidity: currentStation?.current_reading?.relative_humidity ?? baseLatest.relative_humidity,
+    surface_pressure: currentStation?.current_reading?.surface_pressure ?? baseLatest.surface_pressure,
+    time: currentStation?.current_reading?.timestamp ?? baseLatest.time
+  } : undefined;
+  const isAnomalyCurrentlyActive = latestRecord?.is_anomaly ?? (alertsData ? alertsData.alerts.some(a => a.row_verdict === 'WRONG' && a.triage_status !== 'Resolved' && a.triage_status !== 'False Alarm') : false);
 
   // Station health mapping for maps and quick icons
   const stationHealthMap: Record<number, 'Healthy' | 'Warning' | 'Critical'> = {};
@@ -237,6 +298,19 @@ export const App: React.FC = () => {
           >
             <Activity className="h-4 w-4" />
             <span>Station Surveillance</span>
+          </button>
+
+          <button
+            id="tab-view-custom-station"
+            onClick={() => setActiveTab('custom-station')}
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'custom-station'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+            }`}
+          >
+            <Cpu className="h-4 w-4 text-amber-400" />
+            <span>Custom Station Demo (2-Reading Warm-Up)</span>
           </button>
 
           <button
@@ -323,11 +397,20 @@ export const App: React.FC = () => {
           stations={stations}
           selectedStationId={selectedStationId}
           onSelectStation={(id) => setSelectedStationId(id)}
+          onRefreshLive={() => fetchData(true)}
         />
 
         {/* Tab 1: Station Surveillance */}
         {activeTab === 'dashboard' && (
           <>
+            {/* PMFBY WINDS Hourly Telemetry Banner with Auto-Sync Timer */}
+            <HourlyWeatherSyncBanner
+              syncInfo={syncInfo}
+              currentStation={currentStation}
+              isSyncing={isRefreshing}
+              onSyncNow={handleSyncNow}
+            />
+
             {/* Real-time Telemetry Metrics Cards */}
             <TelemetryCards
               latestRecord={latestRecord}
@@ -352,6 +435,17 @@ export const App: React.FC = () => {
               onAutoCleanAlert={handleAutoCleanAlert}
             />
           </>
+        )}
+
+        {/* Tab 1b: Custom AWS Station & Anomaly Detection Sandbox */}
+        {activeTab === 'custom-station' && (
+          <CustomStationDemo
+            onStationSelected={(id) => {
+              setSelectedStationId(id);
+              fetchData();
+            }}
+            onRefreshParent={() => fetchData()}
+          />
         )}
 
         {/* Tab 2: Geospatial Radar Map */}

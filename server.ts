@@ -23,10 +23,36 @@ async function startServer() {
     });
   });
 
-  // Stations directory
-  app.get(["/stations", "/api/stations"], (req, res) => {
+  // Stations directory with real live telemetry
+  app.get(["/stations", "/api/stations"], async (req, res) => {
+    const force = req.query.refresh === 'true';
+    if (force) {
+      await anomalyEngine.fetchRealLiveTelemetry(true);
+    }
     const stations = anomalyEngine.getStations();
     res.json({ stations });
+  });
+
+  // Dedicated on-demand real-time live telemetry refresh endpoint
+  app.post(["/api/stations/live-refresh", "/api/stations/refresh"], async (req, res) => {
+    await anomalyEngine.fetchRealHourlyWeather(true);
+    const stations = anomalyEngine.getStations();
+    res.json({ status: "success", stations, sync_info: anomalyEngine.getHourlySyncInfo() });
+  });
+
+  // Hourly synchronization status from PMFBY WINDS
+  app.get(["/api/weather/sync-info", "/api/sync-info"], (req, res) => {
+    res.json(anomalyEngine.getHourlySyncInfo());
+  });
+
+  // Trigger hourly weather refresh on demand
+  app.post(["/api/weather/sync-now", "/api/sync-now"], async (req, res) => {
+    await anomalyEngine.fetchRealHourlyWeather(true);
+    res.json({
+      status: "success",
+      sync_info: anomalyEngine.getHourlySyncInfo(),
+      stations: anomalyEngine.getStations()
+    });
   });
 
   // Weather data with period & month filtering
@@ -158,6 +184,50 @@ async function startServer() {
   app.post("/api/reset-data", (req, res) => {
     anomalyEngine.resetSimulations();
     res.json({ status: "success", message: "Simulations reset" });
+  });
+
+  // Custom Station Management Endpoints
+  app.get("/api/custom-stations", (req, res) => {
+    const stations = anomalyEngine.getCustomStations();
+    res.json({ status: "success", stations });
+  });
+
+  app.post("/api/custom-stations", (req, res) => {
+    try {
+      const station = anomalyEngine.createCustomStation(req.body);
+      res.json({ status: "success", station });
+    } catch (err: any) {
+      res.status(400).json({ status: "error", message: err.message || "Failed to create custom station" });
+    }
+  });
+
+  app.get("/api/custom-stations/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const data = anomalyEngine.getCustomStation(id);
+    if (!data) return res.status(404).json({ status: "error", message: "Custom station not found" });
+    res.json({ status: "success", ...data });
+  });
+
+  app.post("/api/custom-stations/:id/readings", (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const result = anomalyEngine.addCustomStationReading(id, req.body);
+      res.json({ status: "success", ...result });
+    } catch (err: any) {
+      res.status(400).json({ status: "error", message: err.message || "Failed to add custom station reading" });
+    }
+  });
+
+  app.post("/api/custom-stations/:id/reset", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const result = anomalyEngine.resetCustomStation(id);
+    res.json({ status: "success", ...result });
+  });
+
+  app.delete("/api/custom-stations/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const deleted = anomalyEngine.deleteCustomStation(id);
+    res.json({ status: "success", deleted });
   });
 
   // Root endpoint: JSON if requested by programmatic client, HTML dashboard for browser
